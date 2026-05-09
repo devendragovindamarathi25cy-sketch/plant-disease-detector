@@ -1,153 +1,189 @@
 from flask import Flask, request
-
-import random
-import os
+from PIL import Image
+import numpy as np
+import tensorflow as tf
 
 app = Flask(__name__)
 
-diseases = [
-    {
-        "name": "Tomato Early Blight",
+# Load AI model
+model = tf.keras.models.load_model("plant_disease_model.h5")
+
+# Disease classes
+classes = [
+    "Tomato Early Blight",
+    "Tomato Late Blight",
+    "Potato Early Blight",
+    "Rice Brown Spot",
+    "Healthy Leaf"
+]
+
+# Medicine database
+medicine_data = {
+    "Tomato Early Blight": {
         "medicine": "Chlorothalonil",
         "suggestion": "Remove infected leaves and avoid overwatering.",
         "severity": "Medium"
     },
-    {
-        "name": "Rice Brown Spot",
+
+    "Tomato Late Blight": {
+        "medicine": "Mancozeb",
+        "suggestion": "Spray fungicide immediately.",
+        "severity": "High"
+    },
+
+    "Potato Early Blight": {
+        "medicine": "Copper Oxychloride",
+        "suggestion": "Use disease-free seeds.",
+        "severity": "Medium"
+    },
+
+    "Rice Brown Spot": {
         "medicine": "Carbendazim",
         "suggestion": "Improve drainage and use healthy seeds.",
         "severity": "Low"
     },
-    {
-        "name": "Potato Late Blight",
-        "medicine": "Mancozeb",
-        "suggestion": "Avoid excess moisture and spray fungicide.",
-        "severity": "High"
-    },
-    {
-        "name": "Corn Leaf Spot",
-        "medicine": "Azoxystrobin",
-        "suggestion": "Use resistant varieties and rotate crops.",
-        "severity": "Medium"
+
+    "Healthy Leaf": {
+        "medicine": "No medicine needed",
+        "suggestion": "Your plant is healthy.",
+        "severity": "None"
     }
-]
+}
 
 @app.route('/')
 def home():
     return '''
     <!DOCTYPE html>
+
     <html>
+
     <head>
-        <title>Plant Disease Detector</title>
+
+        <title>AI Plant Disease Detector</title>
 
         <style>
+
             body{
-                background:#eaf4e5;
-                font-family:Arial;
+                font-family: Arial;
+                background: linear-gradient(to right,#d4fc79,#96e6a1);
                 text-align:center;
-                padding-top:80px;
+                padding-top:70px;
+            }
+
+            .container{
+                background:white;
+                width:85%;
+                max-width:500px;
+                margin:auto;
+                padding:35px;
+                border-radius:20px;
+                box-shadow:0 0 20px rgba(0,0,0,0.2);
             }
 
             h1{
                 color:green;
-                font-size:55px;
             }
 
-            p{
-                font-size:22px;
-            }
-
-            .box{
-                background:white;
-                width:80%;
-                max-width:500px;
-                margin:auto;
-                padding:40px;
-                border-radius:20px;
-                box-shadow:0px 0px 15px gray;
+            input{
+                margin-top:20px;
             }
 
             button{
+                margin-top:20px;
                 background:green;
                 color:white;
                 border:none;
-                padding:15px 35px;
+                padding:12px 25px;
                 border-radius:10px;
-                font-size:20px;
+                font-size:16px;
                 cursor:pointer;
-                margin-top:20px;
             }
 
             button:hover{
                 background:darkgreen;
             }
 
-            input{
-                margin-top:20px;
-                font-size:18px;
-            }
         </style>
 
     </head>
 
     <body>
 
-        <div class="box">
+        <div class="container">
 
-            <h1>🌿 Plant Disease Detector</h1>
+            <h1>🌿 Real AI Plant Disease Detector</h1>
 
             <p>Upload crop leaf image to detect disease</p>
 
-            <form action="/predict" method="post" enctype="multipart/form-data">
+            <form action="/predict" method="POST" enctype="multipart/form-data">
 
                 <input type="file" name="leaf" required>
 
                 <br>
 
-                <button type="submit">
-                    Detect Disease
-                </button>
+                <button type="submit">Detect Disease</button>
 
             </form>
 
         </div>
 
     </body>
+
     </html>
     '''
 
 @app.route('/predict', methods=['POST'])
 def predict():
 
-    disease = random.choice(diseases)
+    file = request.files['leaf']
 
-    confidence = random.randint(90, 99)
+    image = Image.open(file).convert('RGB')
+
+    image = image.resize((224,224))
+
+    img_array = np.array(image)
+
+    img_array = img_array / 255.0
+
+    img_array = np.expand_dims(img_array, axis=0)
+
+    prediction = model.predict(img_array)
+
+    predicted_index = np.argmax(prediction)
+
+    disease_name = classes[predicted_index]
+
+    confidence = round(100 * np.max(prediction),2)
+
+    disease = medicine_data[disease_name]
 
     return f'''
+
     <!DOCTYPE html>
+
     <html>
 
     <head>
 
-        <title>Result</title>
+        <title>Prediction Result</title>
 
         <style>
 
             body{{
-                background:#eaf4e5;
                 font-family:Arial;
+                background: linear-gradient(to right,#d4fc79,#96e6a1);
                 text-align:center;
-                padding-top:60px;
+                padding-top:50px;
             }}
 
             .card{{
                 background:white;
                 width:85%;
-                max-width:600px;
+                max-width:550px;
                 margin:auto;
-                padding:40px;
+                padding:30px;
                 border-radius:20px;
-                box-shadow:0px 0px 15px gray;
+                box-shadow:0 0 20px rgba(0,0,0,0.2);
             }}
 
             h1{{
@@ -158,26 +194,20 @@ def predict():
                 color:green;
             }}
 
-            p{{
-                font-size:22px;
-            }}
-
             img{{
                 width:220px;
                 border-radius:15px;
-                margin-top:20px;
-                margin-bottom:20px;
+                margin-top:15px;
             }}
 
-            button{{
+            .btn{{
+                display:inline-block;
+                margin-top:20px;
                 background:green;
                 color:white;
-                border:none;
-                padding:15px 35px;
+                padding:12px 20px;
                 border-radius:10px;
-                font-size:20px;
-                cursor:pointer;
-                margin-top:20px;
+                text-decoration:none;
             }}
 
         </style>
@@ -190,31 +220,30 @@ def predict():
 
             <h1>🌿 Disease Detected</h1>
 
-            <h2>{disease["name"]}</h2>
+            <h2>{disease_name}</h2>
 
-            <p><b>Confidence:</b> {confidence}%</p>
+            <h3>Confidence: {confidence}%</h3>
 
-            <p><b>Severity:</b> {disease["severity"]}</p>
+            <h3>Severity: {disease['severity']}</h3>
 
-            <p><b>Suggestion:</b><br>
-            {disease["suggestion"]}</p>
+            <p>
+                <b>Suggestion:</b><br>
+                {disease['suggestion']}
+            </p>
 
-            <p><b>Recommended Medicine:</b><br>
-            {disease["medicine"]}</p>
+            <h3>Recommended Medicine:</h3>
 
-            <a href="/">
-                <button>
-                    Check Another Leaf
-                </button>
-            </a>
+            <p>{disease['medicine']}</p>
+
+            <a href="/" class="btn">Check Another Leaf</a>
 
         </div>
 
     </body>
+
     </html>
+
     '''
 
-app.run(
-    host='0.0.0.0',
-    port=int(os.environ.get("PORT", 5000))
-)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
